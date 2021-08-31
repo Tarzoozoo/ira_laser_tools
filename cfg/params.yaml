@@ -1,0 +1,4 @@
+scan_merger:
+  ros__parameters:
+    fused_frame_name: "base_scan"
+    fused_point_cloud_max_capacity: 55000
