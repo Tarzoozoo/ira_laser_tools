@@ -56,7 +56,7 @@ class LaserscanMergerNode : public rclcpp::Node {
   void convertToAffine3f(const geometry_msgs::msg::Transform &tf,
                          Eigen::Affine3f &af);
 
-  void cloudCallback(sensor_msgs::msg::PointCloud2::ConstSharedPtr fused_point_cloud_);
+  void cloudCallback(sensor_msgs::msg::PointCloud2 fused_point_cloud_);
 
 
   Eigen::Affine3f affine3f_front_lidar_;

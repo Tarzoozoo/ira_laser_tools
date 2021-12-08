@@ -30,11 +30,11 @@ LaserscanMergerNode::LaserscanMergerNode(const rclcpp::NodeOptions &options)
     try {
       RCLCPP_INFO(get_logger(), "Looking up the transform.");
       tx_front_lidar = tf2_buffer
-                           .lookupTransform(fused_frame_name_, "front_scan", //change with the lidars link name
+                           .lookupTransform(fused_frame_name_, "base_scan", //change with the lidars link name
                                             tf2::TimePointZero)
                            .transform;
       tx_back_lidar = tf2_buffer
-                          .lookupTransform(fused_frame_name_, "back_scan", //change with the lidars link name
+                          .lookupTransform(fused_frame_name_, "base_scan_2", //change with the lidars link name
                                            tf2::TimePointZero)
                           .transform;
       break;
@@ -152,7 +152,8 @@ void LaserscanMergerNode::pointCloudCallback(
   // RCLCPP_INFO(this->get_logger(), "here %d.", point_cloud_idx);
   fused_point_cloud_.header.stamp = latest_timestamp;
   fused_point_cloud_publisher_->publish(fused_point_cloud_);
-  
+  // fused_point_cloud_ptr_ = fused_point_cloud_;
+  cloudCallback(fused_point_cloud_);
   /*Eigen::MatrixXf points;
 	getPointCloudAsEigen(fused_point_cloud_,points);
 
@@ -223,40 +224,45 @@ void LaserscanMergerNode::concatenatePointCloud(
 }
 
 void LaserscanMergerNode::cloudCallback(
-  sensor_msgs::msg::PointCloud2::ConstSharedPtr fused_point_cloud_)
+sensor_msgs::msg::PointCloud2 fused_point_cloud_)
 {
+  // RCLCPP_INFO(get_logger(), "build laserscan output");
   // build laserscan output
   auto scan_msg = std::make_unique<sensor_msgs::msg::LaserScan>();
-  scan_msg->header = fused_point_cloud_->header;
+  scan_msg->header = fused_point_cloud_.header;
+  // RCLCPP_INFO(get_logger(), "%s", fused_point_cloud_.header.frame_id.c_str());
+  // RCLCPP_INFO(get_logger(), "scan: %s", scan_msg->header.frame_id.c_str());
   if (!fused_frame_name_.empty()) {
     scan_msg->header.frame_id = fused_frame_name_;
   }
-
-  scan_msg->angle_min = angle_min_;
-  scan_msg->angle_max = angle_max_;
-  scan_msg->angle_increment = angle_increment_;
+  scan_msg->angle_min = -3.14159;
+  scan_msg->angle_max = 3.14159;
+  scan_msg->angle_increment = 0.008750418201088905;
   scan_msg->time_increment = 0.0;
-  scan_msg->scan_time = scan_time_;
-  scan_msg->range_min = range_min_;
-  scan_msg->range_max = range_max_;
-
+  scan_msg->scan_time = 0.0;
+  scan_msg->range_min = 0.11999999731779099;
+  scan_msg->range_max = 3.5;
+  bool use_inf_ = true;
+  double inf_epsilon_ = 0.0;
   // determine amount of rays to create
   uint32_t ranges_size = std::ceil(
     (scan_msg->angle_max - scan_msg->angle_min) / scan_msg->angle_increment);
 
   // determine if laserscan rays with no obstacle data will evaluate to infinity or max_range
   if (use_inf_) {
+    // RCLCPP_ERROR_STREAM(this->get_logger(), "use_inf_:True");
     scan_msg->ranges.assign(ranges_size, std::numeric_limits<double>::infinity());
   } else {
+    // RCLCPP_ERROR_STREAM(this->get_logger(), "use_inf_:Flase");
     scan_msg->ranges.assign(ranges_size, scan_msg->range_max + inf_epsilon_);
   }
 
   // Transform cloud if necessary
-  if (scan_msg->header.frame_id != fused_point_cloud_->header.frame_id) {
+  if (scan_msg->header.frame_id != fused_point_cloud_.header.frame_id) {
     try {
-      auto cloud = std::make_shared<sensor_msgs::msg::PointCloud2>();
+      auto cloud = sensor_msgs::msg::PointCloud2();
       //tf2_->transform(*fused_point_cloud_, *cloud, target_frame_, tf2::durationFromSec(tolerance_));
-      tf2_buffer->transform(*fused_point_cloud_, *cloud, fused_frame_name_, tf2::durationFromSec(tolerance_));
+      tf2_buffer->transform(fused_point_cloud_, cloud, fused_frame_name_, tf2::durationFromSec(tolerance_));
       fused_point_cloud_ = cloud;
     } catch (tf2::TransformException & ex) {
       RCLCPP_ERROR_STREAM(this->get_logger(), "Transform failure: " << ex.what());
@@ -265,10 +271,11 @@ void LaserscanMergerNode::cloudCallback(
   }
 
   // Iterate through pointcloud
-  for (sensor_msgs::PointCloud2ConstIterator<float> iter_x(*fused_point_cloud_, "x"),
-    iter_y(*fused_point_cloud_, "y"), iter_z(*fused_point_cloud_, "z");
+  for (sensor_msgs::PointCloud2ConstIterator<float> iter_x(fused_point_cloud_, "x"),
+    iter_y(fused_point_cloud_, "y"), iter_z(fused_point_cloud_, "z");
     iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z)
   {
+      // RCLCPP_INFO(get_logger(), "build laserscan output");
     if (std::isnan(*iter_x) || std::isnan(*iter_y) || std::isnan(*iter_z)) {
       RCLCPP_DEBUG(
         this->get_logger(),
@@ -277,27 +284,28 @@ void LaserscanMergerNode::cloudCallback(
       continue;
     }
 
-    if (*iter_z > max_height_ || *iter_z < min_height_) {
-      RCLCPP_DEBUG(
-        this->get_logger(),
-        "rejected for height %f not in range (%f, %f)\n",
-        *iter_z, min_height_, max_height_);
-      continue;
-    }
+    // if (*iter_z > max_height_ || *iter_z < min_height_) {
+    //   RCLCPP_INFO(get_logger(), "build laserscan output2");
+    //   RCLCPP_DEBUG(
+    //     this->get_logger(),
+    //     "rejected for height %f not in range (%f, %f)\n",
+    //     *iter_z, min_height_, max_height_);
+    //   continue;
+    // }
 
     double range = hypot(*iter_x, *iter_y);
-    if (range < range_min_) {
+    if (range < scan_msg->range_min) {
       RCLCPP_DEBUG(
         this->get_logger(),
         "rejected for range %f below minimum value %f. Point: (%f, %f, %f)",
-        range, range_min_, *iter_x, *iter_y, *iter_z);
+        range, scan_msg->range_min, *iter_x, *iter_y, *iter_z);
       continue;
     }
-    if (range > range_max_) {
+    if (range > scan_msg->range_max) {
       RCLCPP_DEBUG(
         this->get_logger(),
         "rejected for range %f above maximum value %f. Point: (%f, %f, %f)",
-        range, range_max_, *iter_x, *iter_y, *iter_z);
+        range, scan_msg->range_max, *iter_x, *iter_y, *iter_z);
       continue;
     }
 
@@ -313,6 +321,7 @@ void LaserscanMergerNode::cloudCallback(
     // overwrite range at laserscan ray if new range is smaller
     int index = (angle - scan_msg->angle_min) / scan_msg->angle_increment;
     if (range < scan_msg->ranges[index]) {
+      RCLCPP_DEBUG(get_logger(), "overwrite range at laserscan ray if new range is smaller");
       scan_msg->ranges[index] = range;
     }
   }

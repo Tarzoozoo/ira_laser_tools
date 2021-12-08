@@ -6,7 +6,7 @@ import os
 
 scan_merger_node_pkg_prefix = get_package_share_directory('scan_merger')
 scan_merger_node_param_file = os.path.join(scan_merger_node_pkg_prefix,
-                                                  'config/params.yaml')
+                                                  'cfg/params.yaml')
 
 
 def generate_launch_description():
@@ -17,9 +17,9 @@ def generate_launch_description():
         remappings=[
             ("output", "/transformed_points_raw"),
             #("input1", "/lidar_front/points_raw"),
-            ("input1", "/front_scan/points_raw"),
+            ("input1", "/cloud_front"),
             #("input2", "/lidar_back/points_raw"),
-            ("input2", "/back_scan/points_raw"),
+            ("input2", "/cloud_back"),
             ("scan", "/merged_scan")
         ]
     )
