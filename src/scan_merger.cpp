@@ -30,11 +30,11 @@ LaserscanMergerNode::LaserscanMergerNode(const rclcpp::NodeOptions &options)
     try {
       RCLCPP_INFO(get_logger(), "Looking up the transform.");
       tx_front_lidar = tf2_buffer
-                           .lookupTransform(fused_frame_name_, "base_scan", //change with the lidars link name
+                           .lookupTransform(fused_frame_name_, "hokuyo_scan_link", //change with the lidars link name
                                             tf2::TimePointZero)
                            .transform;
       tx_back_lidar = tf2_buffer
-                          .lookupTransform(fused_frame_name_, "base_scan_2", //change with the lidars link name
+                          .lookupTransform(fused_frame_name_, "hokuyo2_scan_link", //change with the lidars link name
                                            tf2::TimePointZero)
                           .transform;
       break;
@@ -120,7 +120,6 @@ void LaserscanMergerNode::pointCloudCallback(
   sensor_msgs::PointCloud2Modifier modifier(fused_point_cloud_);
   modifier.clear();
   modifier.resize(fused_point_cloud_max_capacity_);
-
   // get latest timestamp
   auto latest_timestamp = msg1->header.stamp;
   if (std::chrono::nanoseconds(latest_timestamp.nanosec) <
@@ -163,33 +162,31 @@ void LaserscanMergerNode::pointCloudCallback(
 void LaserscanMergerNode::concatenatePointCloud(
     const PointCloudMsg &pc_in, PointCloudMsg &pc_out, uint32_t &concat_idx,
     const Eigen::Affine3f &affine_tf) {
-
   // get const iterator from input msg
   sensor_msgs::PointCloud2ConstIterator<float> x_it_in(pc_in, "x");
   sensor_msgs::PointCloud2ConstIterator<float> y_it_in(pc_in, "y");
   sensor_msgs::PointCloud2ConstIterator<float> z_it_in(pc_in, "z");
-  sensor_msgs::PointCloud2ConstIterator<float> intensity_it_in(pc_in,
-                                                               "intensity");
+  // sensor_msgs::PointCloud2ConstIterator<float> intensity_it_in(pc_in,
+  //                                                              "intensity");
 
   // get iterator from output msg
   sensor_msgs::PointCloud2Iterator<float> x_it_out(pc_out, "x");
   sensor_msgs::PointCloud2Iterator<float> y_it_out(pc_out, "y");
   sensor_msgs::PointCloud2Iterator<float> z_it_out(pc_out, "z");
-  sensor_msgs::PointCloud2Iterator<float> intensity_it_out(pc_out, "intensity");
-
+  // sensor_msgs::PointCloud2Iterator<float> intensity_it_out(pc_out, "intensity");
   const int idx = static_cast<int>(concat_idx);
   x_it_out += idx;
   y_it_out += idx;
   z_it_out += idx;
-  intensity_it_out += idx;
+  // intensity_it_out += idx;
 
   while (x_it_in != x_it_in.end() && y_it_in != y_it_in.end() &&
-         z_it_in != z_it_in.end() && intensity_it_in != intensity_it_in.end()) {
+         z_it_in != z_it_in.end()) {
     // input point
     auto x_in = *x_it_in;
     auto y_in = *y_it_in;
     auto z_in = *z_it_in;
-    auto intensity_in = *intensity_it_in;
+    // auto intensity_in = *intensity_it_in;
 
     // apply static transform from input point to baselink
     Eigen::Vector3f out_mat = affine_tf * Eigen::Vector3f{x_in, y_in, z_in};
@@ -199,13 +196,12 @@ void LaserscanMergerNode::concatenatePointCloud(
 
     // add input to output msg if its idx is not at the end of iter
     if (x_it_out != x_it_out.end() && y_it_out != y_it_out.end() &&
-        z_it_out != z_it_out.end() &&
-        intensity_it_out != intensity_it_out.end()) {
+        z_it_out != z_it_out.end()) {
       // add input point
       *x_it_out = x_in;
       *y_it_out = y_in;
       *z_it_out = z_in;
-      *intensity_it_out = intensity_in;
+      // *intensity_it_out = intensity_in;
 
       // increment the index to keep track of the pointcloud's size
       ++concat_idx;
@@ -214,19 +210,18 @@ void LaserscanMergerNode::concatenatePointCloud(
     ++x_it_in;
     ++y_it_in;
     ++z_it_in;
-    ++intensity_it_in;
+    // ++intensity_it_in;
 
     ++x_it_out;
     ++y_it_out;
     ++z_it_out;
-    ++intensity_it_out;
+    // ++intensity_it_out;
   }
 }
 
 void LaserscanMergerNode::cloudCallback(
 sensor_msgs::msg::PointCloud2 fused_point_cloud_)
 {
-  // RCLCPP_INFO(get_logger(), "build laserscan output");
   // build laserscan output
   auto scan_msg = std::make_unique<sensor_msgs::msg::LaserScan>();
   scan_msg->header = fused_point_cloud_.header;
@@ -237,11 +232,11 @@ sensor_msgs::msg::PointCloud2 fused_point_cloud_)
   }
   scan_msg->angle_min = -3.14159;
   scan_msg->angle_max = 3.14159;
-  scan_msg->angle_increment = 0.008750418201088905;
+  scan_msg->angle_increment = 0.004363323096185923;
   scan_msg->time_increment = 0.0;
   scan_msg->scan_time = 0.0;
-  scan_msg->range_min = 0.11999999731779099;
-  scan_msg->range_max = 3.5;
+  scan_msg->range_min = 0.03500000014901161;
+  scan_msg->range_max = 40.0;
   bool use_inf_ = true;
   double inf_epsilon_ = 0.0;
   // determine amount of rays to create

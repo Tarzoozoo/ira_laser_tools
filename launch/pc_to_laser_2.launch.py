@@ -13,8 +13,8 @@ def generate_launch_description():
             package='pointcloud_to_laserscan',
             executable='laserscan_to_pointcloud_node',
             name='laserscan_to_pointcloud_back',
-            remappings=[('scan_in', '/scan_2'),
+            remappings=[('scan_in', '/scan_back'),
                         ('cloud', '/cloud_back')],
-            parameters=[{'target_frame': 'base_scan_2', 'transform_tolerance': 0.01}]
+            parameters=[{'target_frame': 'hokuyo2_scan_link', 'transform_tolerance': 0.01}]
         ),
     ])
