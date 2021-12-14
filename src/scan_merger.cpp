@@ -30,7 +30,7 @@ LaserscanMergerNode::LaserscanMergerNode(const rclcpp::NodeOptions &options)
     try {
       RCLCPP_INFO(get_logger(), "Looking up the transform.");
       tx_front_lidar = tf2_buffer
-                           .lookupTransform(fused_frame_name_, "hokuyo_scan_link", //change with the lidars link name
+                           .lookupTransform(fused_frame_name_, "base_footprint", //change with the lidars link name
                                             tf2::TimePointZero)
                            .transform;
       tx_back_lidar = tf2_buffer
